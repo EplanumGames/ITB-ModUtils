@@ -1,5 +1,14 @@
 local board = {}
 
+function board:getSpaceHash(x, y)
+	--this is how they do it in the game scripts
+	return x + y * 10
+end
+
+function board:getSpaceHash(space)
+	return self:getSpaceHash(space.x, space.y)
+end
+
 --[[
 	Returns the first point on the board that matches the specified predicate.
 	If no matching point is found, this function returns nil.
@@ -7,14 +16,14 @@ local board = {}
 	predicate
 		A function taking a Point as argument, and returning a boolean value.
 --]]
-function board:getSpace(predicate)
+function board:getSpace(predicate, ...)
 	assert(type(predicate) == "function")
 
 	local size = Board:GetSize()
 	for y = 0, size.y - 1 do
 		for x = 0, size.x - 1 do
 			local p = Point(x, y)
-			if predicate(p) then
+			if predicate(p, ...) then
 				return p
 			end
 		end
@@ -23,73 +32,87 @@ function board:getSpace(predicate)
 	error("Could not find a Board space satisfying the given condition.\n" .. debug.traceback())
 end
 
-function board:areValidBoardParamFunctions(functionValueTable)
-	if Board then
-		local allGood = true
-		
-		for field, _ in pairs(functionValueTable) do
-			--ensure it is either a function in the Board object our ourself
-			if (not Board[field]) and (not self[field]) then
-				LOG("Warning: board:areValidBoardParamFunctions: Bad field passed (not found in Board or board) - "..field)
-				allGood = false
-			--and make sure it starts with Get or Is to ensure it is the correct type of function
-			elseif not (modApi:stringStartsWith(field:lower, "get") or 
-						modApi:stringStartsWith(field:lower, "is")) then
-				LOG("Warning: board:areValidBoardParamFunctions: Field does not appear to be a valid query function (start with get or is) - "..field)
-				allGood = false
-			end
-		end
-		
-		return allGood
-	end
+function board:getSpaces(predicate, ...)
+	assert(type(predicate) == "function")
 	
-	return false
-end
-
-function board:doesSpaceMatch(point, compareInfo)
-	local allMatched = true
-				
-	for field, value in pairs(compareInfo) do
-		--allows you to pass a custom matcher into the function (i.e not match, any of, etc.)
-		if type(value) == "fn" then
-			if Board[field] then
-				allMatched = allMatched and value(Board[field](Board, point))
-			else
-				allMatched = allMatched and value(self[field](Board, point))
-			end
-		--Single value matchers
-		else
-			if Board[field] and Board[field](Board, point) ~= value then
-				allMatched = false
-			elseif self[field](self, point) ~= value then
-				allMatched = false
-			end
-		end
-	end
-	
-	return allMatched
-end
-
-function board:getSpacesThatMatch(compareInfo)
 	local matches = {}
 	
-	--covers if board doesnt exist as well
-	if self:areValidBoardParamFunctions(compareInfo) then
+	if Board then
 		--go through each space on the board and check if it matches
 		local size = Board:GetSize()
 		for y = 0, size.y - 1 do
 			for x = 0, size.x - 1 do
 				local p = Point(x, y)
-				
-				--if the space matches, add it to the list
-				if self:doesSpaceMatch(p, compareInfo) then
-					matches[self:GetPointHash(p)] = p
+				if predicate(p, ...) then
+					matches[self:getSpaceHash(p)] = p
 				end
 			end
 		end
 	end
 	
 	return matches
+end
+
+function board:getSpacesThatBorder(predicate, ...)
+	assert(type(predicate) == "function")
+
+	bordering = {}
+
+	--covers if board doesnt exist as well
+	if Board then
+		local size = Board:GetSize()
+		for y = 0, size.y - 1 do
+			for x = 0, size.x - 1 do
+				local currPoint = Point(x, y)
+				
+				--only check + x and y spaces to optimize some
+				local adjacents = {}
+				if x < size.x - 1 then
+					adjacents[self:getSpaceHash(x + 1, y)] = Point(x + 1, y)
+				end
+				if y < size.y - 1 then
+					adjacents[self:getSpaceHash(x, y + 1)] = Point(x, y + 1)
+				end
+				
+				--if it matches then see if we need to add the + x and y spaces
+				if predicate(currPoint, ...) then
+					for hash, point in pairs(adjacents) do
+						--only add if it doesn't match
+						if not predicate(point, ...) then
+							bordering[hash] = point
+						end
+					end
+				--otherwise check the + x and y spaces to see if we should add this point
+				else
+					for _, point in pairs(adjacents) do
+						if predicate(point, ...) then
+							bordering[self:getSpaceHash(currPoint)] = currPoint
+						end
+					end
+				end
+			end
+		end
+	end
+	
+	return bordering
+end
+
+function board:isSpaceSurroundedBy(space, predicate, ...)
+	assert(type(predicate) == "function")
+
+	local surrondingTiles = {space + DIR_VECTORS[1],
+			space + DIR_VECTORS[2],
+			space + DIR_VECTORS[3],
+			space + DIR_VECTORS[0],
+	}
+ 
+	for _, p in pairs(surrondingTiles) do 
+		if not predicate(p, ...) then
+			return false
+		end
+	end
+	
+	return true
 end
 
 --[[
@@ -199,6 +222,8 @@ function board:getTileTable(point)
 			return entry
 		end
 	end
+	
+	return {}
 end
 
 function board:getTileHealth(point)
