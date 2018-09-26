@@ -23,6 +23,75 @@ function board:getSpace(predicate)
 	error("Could not find a Board space satisfying the given condition.\n" .. debug.traceback())
 end
 
+function board:areValidBoardParamFunctions(functionValueTable)
+	if Board then
+		local allGood = true
+		
+		for field, _ in pairs(functionValueTable) do
+			--ensure it is either a function in the Board object our ourself
+			if (not Board[field]) and (not self[field]) then
+				LOG("Warning: board:areValidBoardParamFunctions: Bad field passed (not found in Board or board) - "..field)
+				allGood = false
+			--and make sure it starts with Get or Is to ensure it is the correct type of function
+			elseif not (modApi:stringStartsWith(field:lower, "get") or 
+						modApi:stringStartsWith(field:lower, "is")) then
+				LOG("Warning: board:areValidBoardParamFunctions: Field does not appear to be a valid query function (start with get or is) - "..field)
+				allGood = false
+			end
+		end
+		
+		return allGood
+	end
+	
+	return false
+end
+
+function board:doesSpaceMatch(point, compareInfo)
+	local allMatched = true
+				
+	for field, value in pairs(compareInfo) do
+		--allows you to pass a custom matcher into the function (i.e not match, any of, etc.)
+		if type(value) == "fn" then
+			if Board[field] then
+				allMatched = allMatched and value(Board[field](Board, point))
+			else
+				allMatched = allMatched and value(self[field](Board, point))
+			end
+		--Single value matchers
+		else
+			if Board[field] and Board[field](Board, point) ~= value then
+				allMatched = false
+			elseif self[field](self, point) ~= value then
+				allMatched = false
+			end
+		end
+	end
+	
+	return allMatched
+end
+
+function board:getSpacesThatMatch(compareInfo)
+	local matches = {}
+	
+	--covers if board doesnt exist as well
+	if self:areValidBoardParamFunctions(compareInfo) then
+		--go through each space on the board and check if it matches
+		local size = Board:GetSize()
+		for y = 0, size.y - 1 do
+			for x = 0, size.x - 1 do
+				local p = Point(x, y)
+				
+				--if the space matches, add it to the list
+				if self:doesSpaceMatch(p, compareInfo) then
+					matches[self:GetPointHash(p)] = p
+				end
+			end
+		end
+	end
+	
+	return matches
+end
+
 --[[
 	Returns the first point on the board that is not blocked.
 --]]
