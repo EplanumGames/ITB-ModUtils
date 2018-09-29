@@ -99,6 +99,36 @@ function board:getSpacesThatBorder(predicate, ...)
 	return bordering
 end
 
+local function getGrouping_internal(space, groupedSpaces, boarderingSpaces, predicate, ...)
+	if not groupedSpaces[board:getSpaceHash(space)] then
+		groupedSpaces[board:getSpaceHash(space)] = space
+	
+		local size = Board:GetSize()
+		for _, dir in pairs(DIR_VECTORS) do
+			local p = space + dir
+			if p.x >= 0 and p.x < size.x and p.y >= 0 and p.y < size.y then
+				if predicate(p, ...) then
+					getGrouping_internal(p, groupedSpaces, boarderingSpaces, predicate, ...)
+				else
+					boarderingSpaces[board:getSpaceHash(p)] = p
+				end
+			end
+		end
+	end
+end
+
+function board:getGroupingOfSpaces(spaceInGroup, predicate, ...)
+	assert(type(predicate) == "function")
+	
+	local spaces = {}
+	spaces.group = {}
+	spaces.boardering = {}
+	
+	getGrouping_internal(spaceInGroup, spaces.group, spaces.boardering, predicate, ...)
+	
+	return spaces
+end
+
 function board:isSpaceSurroundedBy(space, predicate, ...)
 	assert(type(predicate) == "function")
 
