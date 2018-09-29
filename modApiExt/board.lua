@@ -1,12 +1,14 @@
 local board = {}
 
-function board:getSpaceHash(x, y)
+function board:getSpaceHash(spaceOrX, y)
+	local pX = spaceOrX
+	local pY = y
+	if not y then
+		pX = spaceOrX.x
+		pY = spaceOrX.y
+	end
 	--this is how they do it in the game scripts
-	return x + y * 10
-end
-
-function board:getSpaceHash(space)
-	return self:getSpaceHash(space.x, space.y)
+	return pY * 10 + pX
 end
 
 --[[

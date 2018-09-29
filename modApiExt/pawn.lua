@@ -247,8 +247,10 @@ function pawn:getPilotId(pawnId)
 	end
 end
 
---todo update for massive and flag for flying
-local function pawnTerrainMatcher(p, terrain, includeImpassible, includeFlying, includeMassive, pointsToExclude)
+--todo update for massive and submergable and maybe others
+local function pawnTerrainMatcher(p, terrain, includeImpassible, isConsideredFlying, isConsideredMassive, pointsToExclude)
+	pointsToExclude = pointsToExclude or {}
+	
 	local pTerrain = Board:GetTerrain(p)	
 	
 	--if the terrain is not the terrain we are immediate looking for we need to continue checking if it counts 
@@ -259,12 +261,11 @@ local function pawnTerrainMatcher(p, terrain, includeImpassible, includeFlying, 
 		if (not includeImpassible) or (pTerrain ~= TERRAIN_MOUNTAIN and pTerrain ~= TERRAIN_BUILDING) then
 			--if the unit is flying or (if its a ground unit and) the terrain is not a water-like terrain then
 			--we need to continue checking if it counts towards surronding
-			if unit:IsFlying() or (pTerrain ~= TERRAIN_WATER and pTerrain ~= TERRAIN_ACID and pTerrain ~= TERRAIN_LAVA and pTerrain ~= TERRAIN_EMPTY) then					
+			if isConsideredFlying or (pTerrain ~= TERRAIN_WATER and pTerrain ~= TERRAIN_ACID and pTerrain ~= TERRAIN_LAVA and pTerrain ~= TERRAIN_EMPTY) then					
 				--see if its one of the points that is queued to become the terrain and if it is count it
-				local foundPoint = false
-				for pIdx = 1, #pointsToExclude do
-					if pointsToExclude[pIdx] == p then
-						pIdx = #pointsToExclude
+				local foundPoint = false	
+				for _, v in pairs(pointsToExclude) do
+					if v == p then
 						foundPoint = true
 					end
 				end
@@ -279,12 +280,7 @@ local function pawnTerrainMatcher(p, terrain, includeImpassible, includeFlying, 
 	return true
 end
 
-function pawn:isSurroundedByTerrain(pawnOrId, terrain, includeImpassible, includeFlying, includeMassive, pointsToExclude)
-	includeImpassible = includeImpassible or true
-	includeFlying = includeFlying or true
-	includeMassive = includeMassive or true
-	pointsToBeTerrain = pointsToBeTerrain or {}
-	
+function pawn:isSurroundedByTerrain(pawnOrId, terrain, includeImpassible, isConsideredFlying, isConsideredMassive, pointsToExclude)
 	--get the pawn data if it was not passed to us
 	local unit = pawnOrId
 	if type(pawnOrId) == "number" then
@@ -295,14 +291,31 @@ function pawn:isSurroundedByTerrain(pawnOrId, terrain, includeImpassible, includ
 		unit = Board:GetPawn(pawnOrId)
 	end
 	
+	--if its not false (i.e. not set), set it to true
+	if includeImpassible ~= false then
+		includeImpassible = true
+	end
+	
+	--if its not false (true or unset, set it to itself or the attribute of the unit)
+	if isConsideredFlying ~= false then
+		isConsideredFlying = isConsideredFlying or unit:IsFlying()
+	end 
+	
+	--if its not false (true or unset, set it to itself or the attribute of the unit)
+	if isConsideredMassive ~= false then
+		isConsideredMassive = isConsideredMassive or unit:IsMassive()
+	end 
+	
+	pointsToExclude = pointsToExclude or {}
+	
 	--get the space of the unit
 	local point = unit:GetSpace()
  
 	--todo update for massive
-	return self.board:isSpaceSurroundedBy(point, pawnTerrainMatcher, terrain, includeImpassible, includeFlying, includeMassive, pointsToExclude)
+	return self.board:isSpaceSurroundedBy(point, pawnTerrainMatcher, terrain, includeImpassible, isConsideredFlying, isConsideredMassive, pointsToExclude)
 end
 
-function pawn:isSurroundedByAndOnTerrain(pawnOrId, terrain, includeImpassible, includeFlying, includeMassive, pointsToExclude)
+function pawn:isSurroundedByAndOnTerrain(pawnOrId, terrain, includeImpassible, isConsideredFlying, isConsideredMassive, pointsToExclude)
 	--get the pawn data if it was not passed to us
 	local unit = pawnOrId
 	if type(pawnOrId) == "number" then
@@ -318,7 +331,7 @@ function pawn:isSurroundedByAndOnTerrain(pawnOrId, terrain, includeImpassible, i
  
 	--todo update for massive
 	return pawnTerrainMatcher(point, terrain, false, false, false, {}) and
-			self.board:isSurroundedByTerrain(point, pawnTerrainMatcher, terrain, includeImpassible, includeFlying, includeMassive, pointsToExclude)
+			self.board:isSpaceSurroundedBy(point, pawnTerrainMatcher, terrain, includeImpassible, includeFlying, includeMassive, pointsToExclude)
 end
 
 return pawn
