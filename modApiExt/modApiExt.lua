@@ -113,12 +113,13 @@ function modApiExt:init(modulesDir)
 		self[k] = v
 	end
 
-	self.vector =   self:loadModule(self.modulesDir.."vector")
-	self.string =   self:loadModule(self.modulesDir.."string")
-	self.board =    self:loadModule(self.modulesDir.."board")
-	self.weapon =   self:loadModule(self.modulesDir.."weapon")
-	self.pawn =     self:loadModule(self.modulesDir.."pawn")
-	self.dialog =   self:loadModule(self.modulesDir.."dialog")
+	self.vector =            self:loadModule(self.modulesDir.."vector")
+	self.string =            self:loadModule(self.modulesDir.."string")
+	self.board =             self:loadModule(self.modulesDir.."board")
+	self.weapon =            self:loadModule(self.modulesDir.."weapon")
+	self.pawn =              self:loadModule(self.modulesDir.."pawn")
+	self.dialog =            self:loadModule(self.modulesDir.."dialog")
+	self.predictableRandom = self:loadModule(self.modulesDir.."predictableRandom")
 
 	return self
 end
@@ -188,6 +189,8 @@ function modApiExt:load(mod, options, version)
 				modApiExt_internal.mostRecent = self
 				modApiExt_internal.fireMostRecentResolvedHooks()
 			end
+
+			self.predictableRandom:registerAutoRollHook()
 		end
 	end)
 
